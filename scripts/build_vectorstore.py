@@ -1,3 +1,4 @@
+"""
 build_vectorstore.py — reads data/faq.md, splits it into chunks, embeds them,
 and saves a searchable Chroma vector store to data/vectorstore/.
 
@@ -36,4 +37,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-    
