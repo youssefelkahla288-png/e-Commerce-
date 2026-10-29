@@ -21,7 +21,9 @@ with open(settings.schema_path, "r", encoding="utf-8") as f:
     SCHEMA = json.load(f)
 
 # temperature=0 => the model is as predictable/factual as possible. Good for SQL.
-llm = ChatOpenAI(model="gpt-4.1 nano", temperature=0, api_key=settings.openai_api_key)
+llm = ChatOpenAI(
+    model=settings.chat_model, temperature=0, api_key=settings.openai_api_key
+)
 
 
 # ---------- STEP 1 PROMPT: write the SQL ----------
@@ -91,7 +93,7 @@ def _is_safe_select(sql: str) -> bool:
     starts_with_select = lowered.startswith("select")
     # Whole-word match so a legit column like "created_at" doesn't trip the "create" rule.
     has_write_keyword = bool(
-        re.search(r"\b(insert|update|delete|drop|alter|create|replace|truncate)\b", lowered)
+        re.search(r"\b(insert|update|delete|drop|alter|create|truncate)\b", lowered)
     )
     has_semicolon = ";" in lowered
     return starts_with_select and not has_write_keyword and not has_semicolon
@@ -109,7 +111,10 @@ def search_products(question: str) -> str:
     # STEP 2: safety check, then run it
     if not _is_safe_select(sql):
         return "I can only look up product information, so I couldn't run that request."
-    rows = run_select(sql)
+    try:
+        rows = run_select(sql)
+    except Exception as e:
+        return f"Je n'ai pas réussi à interroger la base ({e}). Reformule ta question."
 
     # STEP 3: ask the LLM to describe the rows in plain language
     answer = (ANSWER_PROMPT | llm | StrOutputParser()).invoke(
@@ -121,4 +126,3 @@ def search_products(question: str) -> str:
 # Lets us test this file ALONE, without the agent or UI. Run: python -m app.text_to_sql
 if __name__ == "__main__":
     print(search_products("What Apple products do you have under 1500 dollars?"))
-```

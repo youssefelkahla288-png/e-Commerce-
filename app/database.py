@@ -19,12 +19,21 @@ def get_connection():
     return connection
 
 
+def get_readonly_connection():
+    """Open a read-only connection to our SQLite file."""
+    connection = sqlite3.connect(
+        f"file:{settings.db_path}?mode=ro", uri=True
+    )
+    connection.row_factory = sqlite3.Row
+    return connection
+
+
 def run_select(query: str):
     """
     Run a read-only SELECT query and return a list of dictionaries.
     We open, read, and always close — even if something goes wrong (finally).
     """
-    connection = get_connection()
+    connection = get_readonly_connection()
     try:
         cursor = connection.cursor()
         cursor.execute(query)
@@ -32,4 +41,3 @@ def run_select(query: str):
         return [dict(row) for row in rows]   # convert Row objects to plain dicts
     finally:
         connection.close()
-```git

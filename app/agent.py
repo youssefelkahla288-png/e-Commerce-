@@ -1,46 +1,55 @@
-"""
-agent.py — the agent that reads the user's message and picks the right tool.
+"""Route questions to either a local, no-AI assistant or the OpenAI agent."""
 
-It uses LangChain's tool-calling agent: we give it our tools (from tools.py) and a
-short system prompt, and it decides—per message—whether to call product_search,
-faq_lookup, or just answer directly.
-"""
+from typing import Literal
 
-from langchain_openai import ChatOpenAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.agents import create_tool_calling_agent, AgentExecutor
+from app.offline import answer_local
 
-from app.config import settings
-from app.tools import ALL_TOOLS
-
-_llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0, api_key=settings.openai_api_key)
-
-_PROMPT = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            "You are the customer assistant for an online electronics store. "
-            "Use product_search for questions about products (prices, stock, brands). "
-            "Use faq_lookup for questions about policies (shipping, returns, warranty, payment). "
-            "If a tool returns the answer, reply based on it. Be friendly and concise.",
-        ),
-        ("human", "{input}"),
-        MessagesPlaceholder("agent_scratchpad"),  # where the agent keeps its tool-use steps
-    ]
-)
-
-_agent = create_tool_calling_agent(_llm, ALL_TOOLS, _PROMPT)
-_executor = AgentExecutor(agent=_agent, tools=ALL_TOOLS, verbose=True)
+AssistantMode = Literal["local", "openai"]
+_executor = None
 
 
-def ask_agent(message: str) -> str:
-    """Send a user message to the agent and return its final answer."""
-    result = _executor.invoke({"input": message})
-    return result["output"]
+def _get_openai_executor():
+    """Create the LangChain agent only when OpenAI mode is explicitly selected."""
+    global _executor
+    if _executor is None:
+        from langchain.agents import AgentExecutor, create_tool_calling_agent
+        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+        from langchain_openai import ChatOpenAI
+
+        from app.config import settings
+        from app.tools import ALL_TOOLS
+
+        llm = ChatOpenAI(
+            model=settings.chat_model,
+            temperature=0,
+            api_key=settings.openai_api_key,
+        )
+        prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You are the customer assistant for an online electronics store. "
+                    "Use product_search for product questions and faq_lookup for store "
+                    "policies. Be friendly and concise.",
+                ),
+                ("human", "{input}"),
+                MessagesPlaceholder("agent_scratchpad"),
+            ]
+        )
+        agent = create_tool_calling_agent(llm, ALL_TOOLS, prompt)
+        _executor = AgentExecutor(agent=agent, tools=ALL_TOOLS, verbose=True)
+    return _executor
 
 
-# Test this file ALONE:  python -m app.agent
+def ask_agent(message: str, mode: AssistantMode = "local") -> str:
+    """Answer locally by default; contact OpenAI only in explicit OpenAI mode."""
+    if mode == "local":
+        return answer_local(message)
+    if mode == "openai":
+        result = _get_openai_executor().invoke({"input": message})
+        return result["output"]
+    raise ValueError("mode must be either 'local' or 'openai'")
+
+
 if __name__ == "__main__":
-    print(ask_agent("What is the cheapest laptop you have?"))
-    print("-" * 40)
     print(ask_agent("How many days do I have to return a product?"))

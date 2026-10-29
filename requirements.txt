@@ -2,10 +2,12 @@ langchain==0.3.30
 langchain-openai==0.3.35
 langchain-community==0.3.31
 langchain-core==0.3.86
+langchain-text-splitters==0.3.11
 openai==1.109.1
 streamlit==1.59.2
 python-dotenv==1.0.1
 Faker==30.8.2
+pytest==9.2.0
 
 # --- Session 5 additions: vector-store libraries for RAG ---
 # chromadb must be >=1.0 on Windows: the 0.5.x/0.6.x line pins chroma-hnswlib==0.7.6, which
