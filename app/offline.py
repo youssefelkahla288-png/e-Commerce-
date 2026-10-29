@@ -22,13 +22,14 @@ _PRODUCT_WORDS = (
     "stock", "brand", "product", "produit", "produits", "prix", "moins cher",
     "marque", "brand", "category", "catégorie", "categorie", "nom", "chercher",
     "cherche", "recherche", "trouve", "trouver", "search", "find", "disponible",
-    "casque", "telephone", "téléphone",
+    "casque", "telephone", "téléphone", "ecouteur", "écouteur", "montre",
+    "tablette", "moins de",
 )
 _STOP_WORDS = {
     "the", "what", "which", "have", "with", "show", "find", "cheapest", "cheap",
     "price", "prices", "product", "products", "do", "you", "your", "is", "are",
     "a", "an", "of", "for", "me", "please", "les", "des", "une", "un", "quel",
-    "quelle", "quels", "quelles", "montre", "cherche", "trouve", "produit", "produits",
+    "quelle", "quels", "quelles", "cherche", "trouve", "produit", "produits",
     "prix", "moins", "cher", "chère", "marque", "brand", "category", "catégorie",
     "categorie", "nom", "par", "dans", "pour", "sur", "stock", "disponible",
     "disponibles", "recherche", "chercher", "trouver", "find", "search", "sont",
@@ -52,10 +53,15 @@ _MAX_PRICE_PATTERNS = (
 )
 
 _CATEGORY_SYNONYMS = {
-    "casque": ("audio",),
-    "casques": ("audio",),
+    "ordinateur": ("laptop", "laptops"),
+    "portable": ("laptop", "laptops"),
+    "telephone": ("smartphone", "smartphones"),
+    "ecouteur": ("audio", "headphone", "headphones"),
+    "casque": ("audio", "headphone", "headphones"),
     "headphone": ("audio",),
     "headphones": ("audio",),
+    "montre": ("smartwatch", "smartwatches"),
+    "tablette": ("tablet", "tablets"),
 }
 
 _AVAILABILITY_PATTERN = re.compile(
@@ -119,7 +125,10 @@ def _faq_section(question: str) -> str | None:
         )
     if any(term in normalized for term in ("payment", "payer", "paiement", "installment", "carte", "espece", "cash")):
         return "La boutique accepte les espèces et les cartes bancaires. Le paiement en 3 fois est proposé pour les achats de plus de 900 dinars."
-    if any(term in normalized for term in ("contact", "support", "email", "phone", "telephone")):
+    if any(
+        term in normalized
+        for term in ("contact", "support", "email", "numero", "number", "call")
+    ) or re.search(r"\bphone\b", normalized):
         return "Vous pouvez contacter le support à support@techstore.tn ou au 71 234 567, du lundi au samedi, de 9 h à 19 h."
     return None
 
@@ -209,7 +218,9 @@ def _local_product_search(question: str) -> str:
                     # when the catalog stores the corresponding singular form.
                     variants = [token]
                     if len(token) > 4 and token.endswith("s"):
-                        variants.append(token[:-1])
+                        singular = token[:-1]
+                        variants.append(singular)
+                        variants.extend(_CATEGORY_SYNONYMS.get(singular, ()))
                     variants.extend(_CATEGORY_SYNONYMS.get(token, ()))
                     variant_conditions = []
                     for variant in variants:
